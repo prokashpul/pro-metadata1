@@ -7,9 +7,10 @@ interface ResultItemProps {
   selectedPlatforms: Platform[];
   onUpdateMetadata: (id: string, platform: Platform, field: 'title'|'description'|'keywords', value: any) => void;
   onUploadPreview: (id: string, file: File) => void;
+  onRegenerate: (id: string) => void;
 }
 
-const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpdateMetadata, onUploadPreview }) => {
+const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpdateMetadata, onUploadPreview, onRegenerate }) => {
   const [expanded, setExpanded] = useState(item.status === 'complete' || item.status === 'error');
   const [activeTab, setActiveTab] = useState<Platform>(item.activePlatform);
 
@@ -81,6 +82,17 @@ const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpda
           <h3 className="font-semibold text-slate-900 dark:text-white truncate">{item.file.name}</h3>
           <div className="flex items-center gap-2 mt-1">
              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>{statusText}</span>
+             
+             {item.status === 'error' && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onRegenerate(item.id); }}
+                  className="text-xs flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  Retry
+                </button>
+             )}
+
              {isVector && !item.previewFile && (
                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">No Preview</span>
              )}
@@ -222,7 +234,19 @@ const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpda
                     </>
                 ) : (
                     <div className="p-4 text-center text-slate-400 text-sm italic bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800">
-                        {item.status === 'processing' ? 'Generating metadata...' : 'Waiting to process...'}
+                        {item.status === 'processing' ? 'Generating metadata...' : 
+                         item.status === 'error' ? (
+                           <div className="flex flex-col items-center gap-2">
+                             <span className="text-red-500 not-italic font-semibold">Generation Failed</span>
+                             <span className="text-xs max-w-sm truncate">{item.error || "Unknown error occurred"}</span>
+                             <button 
+                               onClick={() => onRegenerate(item.id)}
+                               className="mt-2 text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 not-italic font-medium transition-colors"
+                             >
+                               Try Again
+                             </button>
+                           </div>
+                         ) : 'Waiting to process...'}
                     </div>
                 )}
             </div>

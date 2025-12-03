@@ -132,6 +132,42 @@ const App: React.FC = () => {
      setFiles(prev => prev.map(f => f.id === id ? { ...f, previewFile: file, thumbnail: thumb } : f));
   };
 
+  // Single File Regeneration
+  const handleRegenerate = async (id: string) => {
+    if (apiKeys.length === 0) {
+      setIsModalOpen(true);
+      return;
+    }
+
+    const item = files.find(f => f.id === id);
+    if (!item) return;
+
+    // Set to processing
+    setFiles(current => current.map(f => f.id === id ? { ...f, status: 'processing', error: undefined } : f));
+
+    try {
+      // Pick a random key for the retry to distribute load simpler
+      const key = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+      
+      const metadataResults: Partial<Record<Platform, Metadata>> = {};
+
+      for (const platform of selectedPlatforms) {
+        const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform);
+        metadataResults[platform] = metadata;
+      }
+
+      setFiles(current => current.map(f => 
+        f.id === id 
+        ? { ...f, status: 'complete', platformMetadata: { ...f.platformMetadata, ...metadataResults } } 
+        : f
+      ));
+
+    } catch (error: any) {
+      console.error(error);
+      setFiles(current => current.map(f => f.id === id ? { ...f, status: 'error', error: error.message || "Failed to regenerate" } : f));
+    }
+  };
+
   // Metadata Generation
   const processBatch = async () => {
     if (apiKeys.length === 0) {
@@ -430,6 +466,7 @@ const App: React.FC = () => {
                         selectedPlatforms={selectedPlatforms}
                         onUpdateMetadata={updateMetadata}
                         onUploadPreview={handlePreviewUpload}
+                        onRegenerate={handleRegenerate}
                      />
                    ))
                  )}
