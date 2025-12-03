@@ -18,6 +18,11 @@ const App: React.FC = () => {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
+  // Derived State for Progress
+  const processedCount = files.filter(f => f.status === 'complete' || f.status === 'error').length;
+  const totalCount = files.length;
+  const progressPercentage = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 0;
+
   // Initialize
   useEffect(() => {
     const savedKeys = localStorage.getItem('msp_api_keys');
@@ -320,17 +325,38 @@ const App: React.FC = () => {
               </div>
 
               <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700 space-y-3">
-                 <button 
-                    onClick={processBatch}
-                    disabled={files.length === 0 || isProcessing || selectedPlatforms.length === 0}
-                    className="w-full py-3 bg-adobe hover:bg-red-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 shadow-lg shadow-red-500/20"
-                 >
-                    {isProcessing && <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                    {isProcessing ? 'Processing...' : 'Generate Metadata'}
-                 </button>
+                 {isProcessing ? (
+                   <div className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3 shadow-inner">
+                      <div className="flex justify-between items-center text-sm">
+                         <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                           <svg className="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                           Processing...
+                         </span>
+                         <span className="font-mono text-slate-500 dark:text-slate-400 font-medium">{processedCount}/{totalCount}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                         <div 
+                           className="bg-adobe h-2.5 rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(250,0,0,0.5)]" 
+                           style={{ width: `${progressPercentage}%` }}
+                         ></div>
+                      </div>
+                      <p className="text-xs text-center text-slate-400 dark:text-slate-500 animate-pulse">
+                         Generating optimized metadata with AI...
+                      </p>
+                   </div>
+                 ) : (
+                   <button 
+                      onClick={processBatch}
+                      disabled={files.length === 0 || selectedPlatforms.length === 0}
+                      className="w-full py-3 bg-adobe hover:bg-red-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 shadow-lg shadow-red-500/20"
+                   >
+                      Generate Metadata
+                   </button>
+                 )}
+                 
                  <button 
                     onClick={handleClearAll}
-                    disabled={files.length === 0}
+                    disabled={files.length === 0 || isProcessing}
                     className="w-full py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-bold transition-colors disabled:opacity-50"
                  >
                     Clear All
@@ -346,15 +372,15 @@ const App: React.FC = () => {
                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">2. Results ({files.length})</h2>
                  
                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="cursor-pointer px-3 py-1.5 text-xs font-bold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1">
+                    <label className={`cursor-pointer px-3 py-1.5 text-xs font-bold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                        Add New
-                       <input type="file" multiple accept=".jpg,.jpeg,.png,.ai,.eps,.mp4,.mov" onChange={handleFileUpload} className="hidden" />
+                       <input type="file" multiple accept=".jpg,.jpeg,.png,.ai,.eps,.mp4,.mov" onChange={handleFileUpload} className="hidden" disabled={isProcessing} />
                     </label>
 
                     <button 
                        onClick={() => setIsBulkEditOpen(true)}
-                       disabled={files.length === 0}
+                       disabled={files.length === 0 || isProcessing}
                        className="px-3 py-1.5 text-xs font-bold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 flex items-center gap-1"
                     >
                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
@@ -363,7 +389,7 @@ const App: React.FC = () => {
 
                     <button 
                        onClick={handleUndo}
-                       disabled={history.length === 0}
+                       disabled={history.length === 0 || isProcessing}
                        className="px-3 py-1.5 text-xs font-bold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                        title="Undo last bulk edit"
                     >
@@ -374,17 +400,17 @@ const App: React.FC = () => {
                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
 
                     {selectedPlatforms.includes('adobe') && (
-                      <button onClick={() => downloadZip('adobe', PLATFORM_CONFIGS.adobe, files)} disabled={files.filter(f => f.status === 'complete').length === 0} className="px-3 py-1.5 text-xs font-bold bg-adobe text-white rounded hover:opacity-90 disabled:opacity-50">
+                      <button onClick={() => downloadZip('adobe', PLATFORM_CONFIGS.adobe, files)} disabled={files.filter(f => f.status === 'complete').length === 0 || isProcessing} className="px-3 py-1.5 text-xs font-bold bg-adobe text-white rounded hover:opacity-90 disabled:opacity-50">
                         📦 Adobe ZIP
                       </button>
                     )}
                     {selectedPlatforms.includes('shutterstock') && (
-                      <button onClick={() => downloadZip('shutterstock', PLATFORM_CONFIGS.shutterstock, files)} disabled={files.filter(f => f.status === 'complete').length === 0} className="px-3 py-1.5 text-xs font-bold bg-shutterstock text-white rounded hover:opacity-90 disabled:opacity-50">
+                      <button onClick={() => downloadZip('shutterstock', PLATFORM_CONFIGS.shutterstock, files)} disabled={files.filter(f => f.status === 'complete').length === 0 || isProcessing} className="px-3 py-1.5 text-xs font-bold bg-shutterstock text-white rounded hover:opacity-90 disabled:opacity-50">
                         📦 Shutter ZIP
                       </button>
                     )}
                     {selectedPlatforms.includes('freepik') && (
-                      <button onClick={() => downloadZip('freepik', PLATFORM_CONFIGS.freepik, files)} disabled={files.filter(f => f.status === 'complete').length === 0} className="px-3 py-1.5 text-xs font-bold bg-freepik text-white rounded hover:opacity-90 disabled:opacity-50">
+                      <button onClick={() => downloadZip('freepik', PLATFORM_CONFIGS.freepik, files)} disabled={files.filter(f => f.status === 'complete').length === 0 || isProcessing} className="px-3 py-1.5 text-xs font-bold bg-freepik text-white rounded hover:opacity-90 disabled:opacity-50">
                         📦 Freepik ZIP
                       </button>
                     )}
