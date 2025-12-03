@@ -1,0 +1,5 @@
+{
+  "name": "MicroStock Metadata Pro",
+  "description": "AI-powered batch metadata generator for Adobe Stock, Shutterstock, and Freepik using Google Gemini 2.0.",
+  "requestFramePermissions": []
+}
