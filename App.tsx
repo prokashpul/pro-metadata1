@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Platform, ProcessedFile, Metadata } from './types';
+import { Platform, ProcessedFile, Metadata, GenerationSettings } from './types';
 import { PLATFORM_CONFIGS, MAX_FILES } from './constants';
 import { generateMetadataForPlatform } from './services/geminiService';
 import { getThumbnail, downloadZip } from './services/fileService';
 import ResultItem from './components/ResultItem';
 import ApiModal from './components/ApiModal';
 import BulkEditModal, { BulkOperations } from './components/BulkEditModal';
+import SettingsPanel from './components/SettingsPanel';
 
 const App: React.FC = () => {
   // State
@@ -17,6 +18,24 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+
+  // New Generation Settings State
+  const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
+    minTitleWords: 5,
+    maxTitleWords: 20,
+    minKeywords: 20,
+    maxKeywords: 49,
+    minDescWords: 8,
+    maxDescWords: 40,
+    enableSilhouette: false,
+    enableCustomPrompt: false,
+    customPromptText: '',
+    enableWhiteBg: false,
+    enableTransparentBg: false,
+    enableProhibitedWords: false,
+    prohibitedWordsText: '',
+    enableSingleWordKeywords: false,
+  });
 
   // Derived State for Progress
   const processedCount = files.filter(f => f.status === 'complete' || f.status === 'error').length;
@@ -152,7 +171,8 @@ const App: React.FC = () => {
       const metadataResults: Partial<Record<Platform, Metadata>> = {};
 
       for (const platform of selectedPlatforms) {
-        const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform);
+        // Pass generationSettings here
+        const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
         metadataResults[platform] = metadata;
       }
 
@@ -199,7 +219,8 @@ const App: React.FC = () => {
             const key = apiKeys[keyIndex % apiKeys.length];
             keyIndex++;
 
-            const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform);
+            // Pass generationSettings here
+            const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
             metadataResults[platform] = metadata;
           }
 
@@ -358,6 +379,11 @@ const App: React.FC = () => {
                      </label>
                   ))}
                 </div>
+              </div>
+
+              {/* SETTINGS PANEL */}
+              <div className="mt-6">
+                 <SettingsPanel settings={generationSettings} onChange={setGenerationSettings} />
               </div>
 
               <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700 space-y-3">

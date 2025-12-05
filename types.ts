@@ -29,6 +29,24 @@ export interface ProcessedFile {
   activePlatform: Platform;
 }
 
+export interface GenerationSettings {
+  minTitleWords: number;
+  maxTitleWords: number;
+  minKeywords: number;
+  maxKeywords: number;
+  minDescWords: number;
+  maxDescWords: number;
+  
+  enableSilhouette: boolean;
+  enableCustomPrompt: boolean;
+  customPromptText: string;
+  enableWhiteBg: boolean;
+  enableTransparentBg: boolean;
+  enableProhibitedWords: boolean;
+  prohibitedWordsText: string;
+  enableSingleWordKeywords: boolean;
+}
+
 export interface AppState {
   files: ProcessedFile[];
   apiKeyPool: string[];

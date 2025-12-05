@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Platform, Metadata } from "../types";
+import { Platform, Metadata, GenerationSettings } from "../types";
 import { PLATFORM_CONFIGS, GEMINI_MODEL } from "../constants";
 
 // Helper to convert File to Base64 with resizing for optimization
@@ -107,7 +107,8 @@ export const generateMetadataForPlatform = async (
   apiKey: string,
   file: File,
   previewFile: File | undefined,
-  platform: Platform
+  platform: Platform,
+  settings: GenerationSettings
 ): Promise<Metadata> => {
   const config = PLATFORM_CONFIGS[platform];
   const ai = new GoogleGenAI({ apiKey });
@@ -118,10 +119,37 @@ export const generateMetadataForPlatform = async (
   // This now returns a resized, memory-optimized image part
   const imagePart = await fileToPart(fileToProcess);
 
-  const prompt = `Generate ${config.name} metadata for this asset. Filename: ${file.name}. 
-  CRITICAL: Title must be ${config.titleMin}-${config.titleMax} chars. 
-  Keywords: ${config.keywordsMin}-${config.keywordsMax} items. 
-  Positive, commercial, SEO-optimized content only.`;
+  // Construct System Prompt with User Settings
+  let systemInstructions = config.systemPrompt;
+  
+  // Add User Customizations
+  const constraints = [];
+  if (settings.enableSilhouette) constraints.push("Subject is a silhouette.");
+  if (settings.enableWhiteBg) constraints.push("Image has an isolated white background.");
+  if (settings.enableTransparentBg) constraints.push("Image has a transparent background.");
+  if (settings.enableSingleWordKeywords) constraints.push("KEYWORDS MUST BE SINGLE WORDS ONLY (No phrases).");
+  if (settings.enableProhibitedWords && settings.prohibitedWordsText) {
+    constraints.push(`DO NOT USE these words: ${settings.prohibitedWordsText}.`);
+  }
+  
+  if (constraints.length > 0) {
+    systemInstructions += `\n\nADDITIONAL CONSTRAINTS:\n${constraints.join("\n")}`;
+  }
+
+  if (settings.enableCustomPrompt && settings.customPromptText) {
+    systemInstructions += `\n\nUSER CUSTOM INSTRUCTION:\n${settings.customPromptText}`;
+  }
+
+  // Construct User Prompt with lengths
+  // Note: We respect platform HARD limits (chars) but guide AI with user SOFT limits (words)
+  const userPrompt = `Generate ${config.name} metadata. Filename: ${file.name}.
+  
+  GUIDANCE:
+  - Title: Approx ${settings.minTitleWords}-${settings.maxTitleWords} words (But MUST strictly stay within ${config.titleMin}-${config.titleMax} CHARACTERS).
+  - Keywords: Generate ${settings.minKeywords}-${settings.maxKeywords} keywords.
+  - Description: Approx ${settings.minDescWords}-${settings.maxDescWords} words (Max ${config.descMax} CHARACTERS).
+  
+  Ensure positive, commercial SEO optimization.`;
 
   try {
     const response = await generateContentWithRetry(ai, {
@@ -129,12 +157,12 @@ export const generateMetadataForPlatform = async (
       contents: {
         role: 'user',
         parts: [
-          { text: prompt },
-          imagePart // Image comes second usually, or mixed in parts
+          { text: userPrompt },
+          imagePart 
         ]
       },
       config: {
-        systemInstruction: config.systemPrompt,
+        systemInstruction: systemInstructions,
         temperature: 0.7,
         topP: 0.9,
         topK: 40,
@@ -174,7 +202,7 @@ export const generateMetadataForPlatform = async (
     return {
       title: title,
       description: (json.description || "").substring(0, config.descMax),
-      keywords: (json.keywords || []).slice(0, config.keywordsMax).map((k: string) => k.toLowerCase())
+      keywords: (json.keywords || []).slice(0, settings.maxKeywords).map((k: string) => k.toLowerCase())
     };
 
   } catch (error) {
