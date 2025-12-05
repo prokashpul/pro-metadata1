@@ -65,6 +65,9 @@ const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpda
         : 'border-red-500 dark:border-red-500 focus:ring-2 focus:ring-red-500'
     }`;
 
+  // Word counting helper
+  const countWords = (text: string) => text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
+
   return (
     <div className={`rounded-xl border transition-all duration-300 ${expanded ? 'border-slate-300 dark:border-slate-600 shadow-md' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>
       
@@ -150,11 +153,14 @@ const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpda
                     <>
                         {/* Title */}
                         <div className="space-y-1">
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-baseline">
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Title</label>
-                                <span className={`text-xs ${validation.title ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400 font-bold'}`}>
-                                    {metadata.title.length} / {config.titleMax} chars (Min: {config.titleMin})
-                                </span>
+                                <div className="flex gap-3 text-xs">
+                                  <span className="text-slate-400 dark:text-slate-500">{countWords(metadata.title)} words</span>
+                                  <span className={`${validation.title ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400 font-bold'}`}>
+                                      {metadata.title.length} / {config.titleMax} chars
+                                  </span>
+                                </div>
                             </div>
                             <div className="relative">
                                 <input 
@@ -174,11 +180,14 @@ const ResultItem: React.FC<ResultItemProps> = ({ item, selectedPlatforms, onUpda
 
                         {/* Description */}
                         <div className="space-y-1">
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-baseline">
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Description</label>
-                                <span className={`text-xs ${validation.desc ? 'text-slate-400' : 'text-red-500 font-bold'}`}>
-                                    {metadata.description.length} / {config.descMax}
-                                </span>
+                                <div className="flex gap-3 text-xs">
+                                  <span className="text-slate-400 dark:text-slate-500">{countWords(metadata.description)} words</span>
+                                  <span className={`${validation.desc ? 'text-slate-400' : 'text-red-500 font-bold'}`}>
+                                      {metadata.description.length} / {config.descMax} chars
+                                  </span>
+                                </div>
                             </div>
                             <div className="relative">
                                 <textarea 
