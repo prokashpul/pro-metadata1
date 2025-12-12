@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Platform, ProcessedFile, Metadata, GenerationSettings } from './types';
+import React, { useState, useEffect } from 'react';
+import { Platform, ProcessedFile, Metadata, GenerationSettings, AiProvider } from './types';
 import { PLATFORM_CONFIGS, MAX_FILES } from './constants';
 import { generateMetadataForPlatform } from './services/geminiService';
+import { generateMetadataForPlatformMistral } from './services/mistralService';
+import { generateMetadataForPlatformGroq } from './services/groqService';
 import { getThumbnail, downloadZip } from './services/fileService';
 import ResultItem from './components/ResultItem';
 import ApiModal from './components/ApiModal';
@@ -12,14 +14,21 @@ const App: React.FC = () => {
   // State
   const [files, setFiles] = useState<ProcessedFile[]>([]);
   const [history, setHistory] = useState<ProcessedFile[][]>([]);
-  const [apiKeys, setApiKeys] = useState<string[]>([]);
+  
+  // API Keys
+  const [geminiKeys, setGeminiKeys] = useState<string[]>([]);
+  const [mistralKeys, setMistralKeys] = useState<string[]>([]);
+  const [groqKeys, setGroqKeys] = useState<string[]>([]);
+  
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['adobe', 'shutterstock', 'freepik']);
+  const [selectedProvider, setSelectedProvider] = useState<AiProvider>('gemini');
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
-  // New Generation Settings State
+  // Generation Settings State
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     minTitleWords: 5,
     maxTitleWords: 20,
@@ -44,8 +53,19 @@ const App: React.FC = () => {
 
   // Initialize
   useEffect(() => {
-    const savedKeys = localStorage.getItem('msp_api_keys');
-    if (savedKeys) setApiKeys(JSON.parse(savedKeys));
+    const savedGeminiKeys = localStorage.getItem('msp_api_keys');
+    if (savedGeminiKeys) setGeminiKeys(JSON.parse(savedGeminiKeys));
+    
+    const savedMistralKeys = localStorage.getItem('msp_mistral_keys');
+    if (savedMistralKeys) setMistralKeys(JSON.parse(savedMistralKeys));
+
+    const savedGroqKeys = localStorage.getItem('msp_groq_keys');
+    if (savedGroqKeys) setGroqKeys(JSON.parse(savedGroqKeys));
+
+    const savedProvider = localStorage.getItem('msp_selected_provider') as AiProvider;
+    if (savedProvider && ['gemini', 'mistral', 'groq'].includes(savedProvider)) {
+      setSelectedProvider(savedProvider);
+    }
     
     const savedTheme = localStorage.getItem('msp_dark_mode');
     if (savedTheme === 'true') {
@@ -66,24 +86,70 @@ const App: React.FC = () => {
     }
   };
 
+  // Provider Toggle
+  const handleProviderChange = (provider: AiProvider) => {
+    setSelectedProvider(provider);
+    localStorage.setItem('msp_selected_provider', provider);
+  };
+
   // API Key Management
-  const addApiKey = (key: string) => {
-    const newKeys = [...apiKeys, key];
-    setApiKeys(newKeys);
-    localStorage.setItem('msp_api_keys', JSON.stringify(newKeys));
+  const addApiKey = (provider: AiProvider, key: string) => {
+    if (provider === 'gemini') {
+      const newKeys = [...geminiKeys, key];
+      setGeminiKeys(newKeys);
+      localStorage.setItem('msp_api_keys', JSON.stringify(newKeys));
+    } else if (provider === 'mistral') {
+      const newKeys = [...mistralKeys, key];
+      setMistralKeys(newKeys);
+      localStorage.setItem('msp_mistral_keys', JSON.stringify(newKeys));
+    } else if (provider === 'groq') {
+      const newKeys = [...groqKeys, key];
+      setGroqKeys(newKeys);
+      localStorage.setItem('msp_groq_keys', JSON.stringify(newKeys));
+    }
   };
 
-  const removeApiKey = (index: number) => {
-    const newKeys = [...apiKeys];
-    newKeys.splice(index, 1);
-    setApiKeys(newKeys);
-    localStorage.setItem('msp_api_keys', JSON.stringify(newKeys));
+  const removeApiKey = (provider: AiProvider, index: number) => {
+    if (provider === 'gemini') {
+      const newKeys = [...geminiKeys];
+      newKeys.splice(index, 1);
+      setGeminiKeys(newKeys);
+      localStorage.setItem('msp_api_keys', JSON.stringify(newKeys));
+    } else if (provider === 'mistral') {
+      const newKeys = [...mistralKeys];
+      newKeys.splice(index, 1);
+      setMistralKeys(newKeys);
+      localStorage.setItem('msp_mistral_keys', JSON.stringify(newKeys));
+    } else if (provider === 'groq') {
+      const newKeys = [...groqKeys];
+      newKeys.splice(index, 1);
+      setGroqKeys(newKeys);
+      localStorage.setItem('msp_groq_keys', JSON.stringify(newKeys));
+    }
   };
 
-  const clearApiKeys = () => {
-    setApiKeys([]);
-    localStorage.removeItem('msp_api_keys');
+  const clearApiKeys = (provider: AiProvider) => {
+    if (provider === 'gemini') {
+      setGeminiKeys([]);
+      localStorage.removeItem('msp_api_keys');
+    } else if (provider === 'mistral') {
+      setMistralKeys([]);
+      localStorage.removeItem('msp_mistral_keys');
+    } else if (provider === 'groq') {
+      setGroqKeys([]);
+      localStorage.removeItem('msp_groq_keys');
+    }
   };
+
+  // Helper to get active keys
+  const getActiveKeys = () => {
+    if (selectedProvider === 'gemini') return geminiKeys;
+    if (selectedProvider === 'mistral') return mistralKeys;
+    if (selectedProvider === 'groq') return groqKeys;
+    return [];
+  };
+
+  const hasKeys = () => getActiveKeys().length > 0;
 
   // File Handling
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,7 +219,7 @@ const App: React.FC = () => {
 
   // Single File Regeneration
   const handleRegenerate = async (id: string) => {
-    if (apiKeys.length === 0) {
+    if (!hasKeys()) {
       setIsModalOpen(true);
       return;
     }
@@ -165,14 +231,21 @@ const App: React.FC = () => {
     setFiles(current => current.map(f => f.id === id ? { ...f, status: 'processing', error: undefined } : f));
 
     try {
-      // Pick a random key for the retry to distribute load simpler
-      const key = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+      // Pick random key
+      const keys = getActiveKeys();
+      const key = keys[Math.floor(Math.random() * keys.length)];
       
       const metadataResults: Partial<Record<Platform, Metadata>> = {};
 
       for (const platform of selectedPlatforms) {
-        // Pass generationSettings here
-        const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
+        let metadata;
+        if (selectedProvider === 'gemini') {
+          metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
+        } else if (selectedProvider === 'mistral') {
+          metadata = await generateMetadataForPlatformMistral(key, item.file, item.previewFile, platform, generationSettings);
+        } else if (selectedProvider === 'groq') {
+          metadata = await generateMetadataForPlatformGroq(key, item.file, item.previewFile, platform, generationSettings);
+        }
         metadataResults[platform] = metadata;
       }
 
@@ -190,7 +263,7 @@ const App: React.FC = () => {
 
   // Metadata Generation
   const processBatch = async () => {
-    if (apiKeys.length === 0) {
+    if (!hasKeys()) {
       setIsModalOpen(true);
       return;
     }
@@ -199,8 +272,9 @@ const App: React.FC = () => {
     let keyIndex = 0;
 
     // Process chunk by chunk to avoid browser freezing
-    const concurrency = 6;
+    const concurrency = selectedProvider === 'groq' ? 4 : 6; // Groq rate limits might be tighter
     const items = [...files];
+    const keys = getActiveKeys();
 
     for (let i = 0; i < items.length; i += concurrency) {
       const batch = items.slice(i, i + concurrency);
@@ -216,11 +290,17 @@ const App: React.FC = () => {
 
           for (const platform of platforms) {
             // Rotate keys
-            const key = apiKeys[keyIndex % apiKeys.length];
+            const key = keys[keyIndex % keys.length];
             keyIndex++;
 
-            // Pass generationSettings here
-            const metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
+            let metadata;
+            if (selectedProvider === 'gemini') {
+              metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
+            } else if (selectedProvider === 'mistral') {
+              metadata = await generateMetadataForPlatformMistral(key, item.file, item.previewFile, platform, generationSettings);
+            } else if (selectedProvider === 'groq') {
+              metadata = await generateMetadataForPlatformGroq(key, item.file, item.previewFile, platform, generationSettings);
+            }
             metadataResults[platform] = metadata;
           }
 
@@ -257,9 +337,7 @@ const App: React.FC = () => {
 
   // Bulk Apply
   const handleBulkApply = (ops: BulkOperations) => {
-    // Save current state to history
     setHistory(prev => {
-        // Keep last 10 states to avoid memory issues
         const newHistory = [...prev, files];
         if (newHistory.length > 10) return newHistory.slice(newHistory.length - 10);
         return newHistory;
@@ -274,14 +352,12 @@ const App: React.FC = () => {
           modified = true;
           const meta = newMetadata[p]!;
           
-          // Title
           let title = meta.title;
           if (ops.findText) {
             title = title.split(ops.findText).join(ops.replaceText);
           }
           title = `${ops.prefix}${title}${ops.suffix}`;
 
-          // Keywords
           let keywords = meta.keywords;
           if (ops.addKeywords) {
             const newKws = ops.addKeywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
@@ -296,7 +372,6 @@ const App: React.FC = () => {
     }));
   };
 
-  // Undo last bulk edit
   const handleUndo = () => {
     if (history.length === 0) return;
     const previousState = history[history.length - 1];
@@ -309,23 +384,69 @@ const App: React.FC = () => {
     setHistory([]);
   };
 
-  // Platform Toggle
   const togglePlatform = (p: Platform) => {
     setSelectedPlatforms(prev => 
       prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
     );
   };
 
+  // Helper for selector button styles
+  const getSelectorStyle = (provider: AiProvider) => {
+    const isActive = selectedProvider === provider;
+    if (provider === 'gemini') {
+      return isActive 
+        ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-300 shadow-sm' 
+        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
+    } else if (provider === 'mistral') {
+      return isActive 
+        ? 'bg-white dark:bg-slate-600 text-orange-600 dark:text-orange-300 shadow-sm' 
+        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
+    } else { // groq
+      return isActive 
+        ? 'bg-white dark:bg-slate-600 text-fuchsia-600 dark:text-fuchsia-300 shadow-sm' 
+        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
+    }
+  };
+
+  const getKeyButtonStyle = () => {
+     if (selectedProvider === 'gemini') return 'bg-indigo-600 hover:bg-indigo-700';
+     if (selectedProvider === 'mistral') return 'bg-orange-600 hover:bg-orange-700';
+     return 'bg-fuchsia-600 hover:bg-fuchsia-700';
+  };
+
   return (
     <div className="min-h-screen pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
               <span className="text-adobe">MicroStock</span> Metadata
             </h1>
+            
+            {/* AI Engine Selector */}
+            <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
+               <button 
+                 onClick={() => handleProviderChange('gemini')}
+                 className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('gemini')}`}
+               >
+                 Gemini 2.5
+               </button>
+               <button 
+                 onClick={() => handleProviderChange('mistral')}
+                 className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('mistral')}`}
+               >
+                 Mistral AI
+               </button>
+               <button 
+                 onClick={() => handleProviderChange('groq')}
+                 className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('groq')}`}
+               >
+                 Groq AI
+               </button>
+            </div>
           </div>
+
           <div className="flex items-center gap-3">
              <button 
                onClick={toggleTheme} 
@@ -340,12 +461,36 @@ const App: React.FC = () => {
              </button>
              <button 
                onClick={() => setIsModalOpen(true)}
-               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-white ${getKeyButtonStyle()}`}
              >
-               <span>API Keys</span>
-               <span className="bg-white/20 px-2 py-0.5 rounded text-xs">{apiKeys.length}</span>
+               <span>{selectedProvider === 'gemini' ? 'Gemini' : selectedProvider === 'mistral' ? 'Mistral' : 'Groq'} Keys</span>
+               <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
+                 {getActiveKeys().length}
+               </span>
              </button>
           </div>
+        </div>
+        
+        {/* Mobile Selector */}
+        <div className="sm:hidden mt-4 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
+             <button 
+               onClick={() => handleProviderChange('gemini')}
+               className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('gemini')}`}
+             >
+               Gemini
+             </button>
+             <button 
+               onClick={() => handleProviderChange('mistral')}
+               className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('mistral')}`}
+             >
+               Mistral
+             </button>
+             <button 
+               onClick={() => handleProviderChange('groq')}
+               className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('groq')}`}
+             >
+               Groq
+             </button>
         </div>
       </header>
 
@@ -403,7 +548,7 @@ const App: React.FC = () => {
                          ></div>
                       </div>
                       <p className="text-xs text-center text-slate-400 dark:text-slate-500 animate-pulse">
-                         Generating optimized metadata with AI...
+                         Using {selectedProvider === 'gemini' ? 'Google Gemini' : selectedProvider === 'mistral' ? 'Mistral AI' : 'Groq AI'}...
                       </p>
                    </div>
                  ) : (
@@ -505,7 +650,9 @@ const App: React.FC = () => {
       <ApiModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        apiKeys={apiKeys}
+        geminiKeys={geminiKeys}
+        mistralKeys={mistralKeys}
+        groqKeys={groqKeys}
         onAddKey={addApiKey}
         onRemoveKey={removeApiKey}
         onClearKeys={clearApiKeys}

@@ -1,5 +1,7 @@
 export type Platform = 'adobe' | 'shutterstock' | 'freepik';
 
+export type AiProvider = 'gemini' | 'mistral' | 'groq';
+
 export interface PlatformConfig {
   name: string;
   titleMin: number;
