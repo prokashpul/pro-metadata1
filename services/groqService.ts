@@ -112,7 +112,7 @@ export const generateMetadataForPlatformGroq = async (
   CRITICAL:
   - NO TRADEMARKS/BRANDS.
   - NO REAL NAMES.
-  - Output strictly VALID JSON.
+  - Output strictly VALID JSON (no markdown, just raw JSON).
   `;
 
   const constraints = [];
@@ -160,13 +160,17 @@ export const generateMetadataForPlatformGroq = async (
           ]
         }
       ],
-      response_format: { type: "json_object" },
+      // Note: Groq Vision models do not currently support response_format: { type: "json_object" } consistently.
+      // We rely on the system prompt to enforce JSON structure.
       temperature: 0.5,
       max_tokens: 1024,
     });
 
-    const content = result.choices[0]?.message?.content;
+    let content = result.choices[0]?.message?.content;
     if (!content) throw new Error("No content generated from Groq");
+
+    // Cleanup: Remove markdown code blocks if present (e.g. ```json ... ```)
+    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const json = JSON.parse(content);
 
