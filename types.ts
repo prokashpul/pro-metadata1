@@ -1,6 +1,7 @@
+
 export type Platform = 'adobe' | 'shutterstock' | 'freepik';
 
-export type AiProvider = 'gemini' | 'mistral' | 'groq';
+export type AiProvider = 'gemini' | 'mistral';
 
 export interface PlatformConfig {
   name: string;
@@ -47,6 +48,7 @@ export interface GenerationSettings {
   enableProhibitedWords: boolean;
   prohibitedWordsText: string;
   enableSingleWordKeywords: boolean;
+  enforceTitleCase: boolean;
 }
 
 export interface AppState {

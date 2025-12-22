@@ -3,7 +3,6 @@ import { Platform, ProcessedFile, Metadata, GenerationSettings, AiProvider } fro
 import { PLATFORM_CONFIGS, MAX_FILES } from './constants';
 import { generateMetadataForPlatform } from './services/geminiService';
 import { generateMetadataForPlatformMistral } from './services/mistralService';
-import { generateMetadataForPlatformGroq } from './services/groqService';
 import { getThumbnail, downloadZip } from './services/fileService';
 import ResultItem from './components/ResultItem';
 import ApiModal from './components/ApiModal';
@@ -18,7 +17,6 @@ const App: React.FC = () => {
   // API Keys
   const [geminiKeys, setGeminiKeys] = useState<string[]>([]);
   const [mistralKeys, setMistralKeys] = useState<string[]>([]);
-  const [groqKeys, setGroqKeys] = useState<string[]>([]);
   
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['adobe', 'shutterstock', 'freepik']);
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>('gemini');
@@ -32,7 +30,7 @@ const App: React.FC = () => {
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     minTitleWords: 5,
     maxTitleWords: 20,
-    minKeywords: 20,
+    minKeywords: 30, // Increased to 30 to match platform mins
     maxKeywords: 49,
     minDescWords: 8,
     maxDescWords: 40,
@@ -44,6 +42,7 @@ const App: React.FC = () => {
     enableProhibitedWords: false,
     prohibitedWordsText: '',
     enableSingleWordKeywords: false,
+    enforceTitleCase: true,
   });
 
   // Derived State for Progress
@@ -59,11 +58,8 @@ const App: React.FC = () => {
     const savedMistralKeys = localStorage.getItem('msp_mistral_keys');
     if (savedMistralKeys) setMistralKeys(JSON.parse(savedMistralKeys));
 
-    const savedGroqKeys = localStorage.getItem('msp_groq_keys');
-    if (savedGroqKeys) setGroqKeys(JSON.parse(savedGroqKeys));
-
     const savedProvider = localStorage.getItem('msp_selected_provider') as AiProvider;
-    if (savedProvider && ['gemini', 'mistral', 'groq'].includes(savedProvider)) {
+    if (savedProvider && ['gemini', 'mistral'].includes(savedProvider)) {
       setSelectedProvider(savedProvider);
     }
     
@@ -102,10 +98,6 @@ const App: React.FC = () => {
       const newKeys = [...mistralKeys, key];
       setMistralKeys(newKeys);
       localStorage.setItem('msp_mistral_keys', JSON.stringify(newKeys));
-    } else if (provider === 'groq') {
-      const newKeys = [...groqKeys, key];
-      setGroqKeys(newKeys);
-      localStorage.setItem('msp_groq_keys', JSON.stringify(newKeys));
     }
   };
 
@@ -120,11 +112,6 @@ const App: React.FC = () => {
       newKeys.splice(index, 1);
       setMistralKeys(newKeys);
       localStorage.setItem('msp_mistral_keys', JSON.stringify(newKeys));
-    } else if (provider === 'groq') {
-      const newKeys = [...groqKeys];
-      newKeys.splice(index, 1);
-      setGroqKeys(newKeys);
-      localStorage.setItem('msp_groq_keys', JSON.stringify(newKeys));
     }
   };
 
@@ -135,9 +122,6 @@ const App: React.FC = () => {
     } else if (provider === 'mistral') {
       setMistralKeys([]);
       localStorage.removeItem('msp_mistral_keys');
-    } else if (provider === 'groq') {
-      setGroqKeys([]);
-      localStorage.removeItem('msp_groq_keys');
     }
   };
 
@@ -145,7 +129,6 @@ const App: React.FC = () => {
   const getActiveKeys = () => {
     if (selectedProvider === 'gemini') return geminiKeys;
     if (selectedProvider === 'mistral') return mistralKeys;
-    if (selectedProvider === 'groq') return groqKeys;
     return [];
   };
 
@@ -243,8 +226,6 @@ const App: React.FC = () => {
           metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
         } else if (selectedProvider === 'mistral') {
           metadata = await generateMetadataForPlatformMistral(key, item.file, item.previewFile, platform, generationSettings);
-        } else if (selectedProvider === 'groq') {
-          metadata = await generateMetadataForPlatformGroq(key, item.file, item.previewFile, platform, generationSettings);
         }
         metadataResults[platform] = metadata;
       }
@@ -272,7 +253,7 @@ const App: React.FC = () => {
     let keyIndex = 0;
 
     // Process chunk by chunk to avoid browser freezing
-    const concurrency = selectedProvider === 'groq' ? 4 : 6; // Groq rate limits might be tighter
+    const concurrency = 6;
     const items = [...files];
     const keys = getActiveKeys();
 
@@ -298,8 +279,6 @@ const App: React.FC = () => {
               metadata = await generateMetadataForPlatform(key, item.file, item.previewFile, platform, generationSettings);
             } else if (selectedProvider === 'mistral') {
               metadata = await generateMetadataForPlatformMistral(key, item.file, item.previewFile, platform, generationSettings);
-            } else if (selectedProvider === 'groq') {
-              metadata = await generateMetadataForPlatformGroq(key, item.file, item.previewFile, platform, generationSettings);
             }
             metadataResults[platform] = metadata;
           }
@@ -397,21 +376,16 @@ const App: React.FC = () => {
       return isActive 
         ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-300 shadow-sm' 
         : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
-    } else if (provider === 'mistral') {
+    } else { // mistral
       return isActive 
         ? 'bg-white dark:bg-slate-600 text-orange-600 dark:text-orange-300 shadow-sm' 
-        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
-    } else { // groq
-      return isActive 
-        ? 'bg-white dark:bg-slate-600 text-fuchsia-600 dark:text-fuchsia-300 shadow-sm' 
         : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
     }
   };
 
   const getKeyButtonStyle = () => {
      if (selectedProvider === 'gemini') return 'bg-indigo-600 hover:bg-indigo-700';
-     if (selectedProvider === 'mistral') return 'bg-orange-600 hover:bg-orange-700';
-     return 'bg-fuchsia-600 hover:bg-fuchsia-700';
+     return 'bg-orange-600 hover:bg-orange-700';
   };
 
   return (
@@ -430,19 +404,13 @@ const App: React.FC = () => {
                  onClick={() => handleProviderChange('gemini')}
                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('gemini')}`}
                >
-                 Gemini 2.5
+                 Gemini
                </button>
                <button 
                  onClick={() => handleProviderChange('mistral')}
                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('mistral')}`}
                >
                  Mistral AI
-               </button>
-               <button 
-                 onClick={() => handleProviderChange('groq')}
-                 className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('groq')}`}
-               >
-                 Groq AI
                </button>
             </div>
           </div>
@@ -463,7 +431,7 @@ const App: React.FC = () => {
                onClick={() => setIsModalOpen(true)}
                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-white ${getKeyButtonStyle()}`}
              >
-               <span>{selectedProvider === 'gemini' ? 'Gemini' : selectedProvider === 'mistral' ? 'Mistral' : 'Groq'} Keys</span>
+               <span>{selectedProvider === 'gemini' ? 'Gemini' : 'Mistral'} Keys</span>
                <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
                  {getActiveKeys().length}
                </span>
@@ -484,12 +452,6 @@ const App: React.FC = () => {
                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('mistral')}`}
              >
                Mistral
-             </button>
-             <button 
-               onClick={() => handleProviderChange('groq')}
-               className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${getSelectorStyle('groq')}`}
-             >
-               Groq
              </button>
         </div>
       </header>
@@ -548,7 +510,7 @@ const App: React.FC = () => {
                          ></div>
                       </div>
                       <p className="text-xs text-center text-slate-400 dark:text-slate-500 animate-pulse">
-                         Using {selectedProvider === 'gemini' ? 'Google Gemini' : selectedProvider === 'mistral' ? 'Mistral AI' : 'Groq AI'}...
+                         Using {selectedProvider === 'gemini' ? 'Google Gemini' : 'Mistral AI'}...
                       </p>
                    </div>
                  ) : (
@@ -652,7 +614,6 @@ const App: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         geminiKeys={geminiKeys}
         mistralKeys={mistralKeys}
-        groqKeys={groqKeys}
         onAddKey={addApiKey}
         onRemoveKey={removeApiKey}
         onClearKeys={clearApiKeys}

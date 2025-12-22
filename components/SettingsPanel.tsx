@@ -148,6 +148,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onChange }) => 
          </div>
 
          <div className="space-y-0.5">
+            <Toggle label="Enforce Title Case" checked={settings.enforceTitleCase} settingKey="enforceTitleCase" info="Automatically capitalizes the first letter of every word in the title." />
+            
             <Toggle label="SILHOUETTE" checked={settings.enableSilhouette} settingKey="enableSilhouette" info="Adds 'Subject is a silhouette' to system prompt." />
             
             <Toggle label="White Background" checked={settings.enableWhiteBg} settingKey="enableWhiteBg" info="Instructs AI that image has an isolated white background." />

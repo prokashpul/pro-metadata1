@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AiProvider } from '../types';
 
@@ -6,14 +7,13 @@ interface ApiModalProps {
   onClose: () => void;
   geminiKeys: string[];
   mistralKeys: string[];
-  groqKeys: string[];
   onAddKey: (provider: AiProvider, key: string) => void;
   onRemoveKey: (provider: AiProvider, index: number) => void;
   onClearKeys: (provider: AiProvider) => void;
 }
 
 const ApiModal: React.FC<ApiModalProps> = ({ 
-  isOpen, onClose, geminiKeys, mistralKeys, groqKeys, onAddKey, onRemoveKey, onClearKeys 
+  isOpen, onClose, geminiKeys, mistralKeys, onAddKey, onRemoveKey, onClearKeys 
 }) => {
   const [activeTab, setActiveTab] = useState<AiProvider>('gemini');
   const [inputVal, setInputVal] = useState('');
@@ -30,13 +30,11 @@ const ApiModal: React.FC<ApiModalProps> = ({
   let currentKeys: string[] = [];
   if (activeTab === 'gemini') currentKeys = geminiKeys;
   else if (activeTab === 'mistral') currentKeys = mistralKeys;
-  else if (activeTab === 'groq') currentKeys = groqKeys;
 
   const getThemeColors = (provider: AiProvider) => {
     switch (provider) {
       case 'gemini': return 'text-indigo-600 border-indigo-600 dark:text-indigo-400 dark:border-indigo-400';
       case 'mistral': return 'text-orange-600 border-orange-600 dark:text-orange-400 dark:border-orange-400';
-      case 'groq': return 'text-fuchsia-600 border-fuchsia-600 dark:text-fuchsia-400 dark:border-fuchsia-400';
       default: return '';
     }
   };
@@ -45,16 +43,15 @@ const ApiModal: React.FC<ApiModalProps> = ({
     switch (provider) {
       case 'gemini': return 'bg-indigo-600 hover:bg-indigo-700';
       case 'mistral': return 'bg-orange-600 hover:bg-orange-700';
-      case 'groq': return 'bg-fuchsia-600 hover:bg-fuchsia-700';
       default: return 'bg-slate-600';
     }
   };
 
   const getDescription = (provider: AiProvider) => {
     switch (provider) {
-      case 'gemini': return "Generate metadata using Google's Gemini 2.5 Flash model. Fast and multimodal.";
+      case 'gemini': return "Generate metadata using Google's Gemini Flash model. Fast and multimodal.";
       case 'mistral': return "Generate metadata using Mistral's Pixtral 12B model. High quality open-weights model.";
-      case 'groq': return "Generate metadata using Llama 3.2 90B Vision on Groq. Extremely fast inference.";
+      default: return "";
     }
   };
 
@@ -89,16 +86,6 @@ const ApiModal: React.FC<ApiModalProps> = ({
             }`}
           >
             Mistral AI
-          </button>
-          <button
-            onClick={() => setActiveTab('groq')}
-            className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'groq'
-                ? getThemeColors('groq')
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-          >
-            Groq AI
           </button>
         </div>
 
@@ -159,8 +146,7 @@ const ApiModal: React.FC<ApiModalProps> = ({
              <a 
                href={
                  activeTab === 'gemini' ? "https://aistudio.google.com/app/apikey" : 
-                 activeTab === 'mistral' ? "https://console.mistral.ai/api-keys/" : 
-                 "https://console.groq.com/keys"
+                 "https://console.mistral.ai/api-keys/"
                } 
                target="_blank" 
                rel="noreferrer" 

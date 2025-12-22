@@ -3,6 +3,13 @@ import { PLATFORM_CONFIGS } from "../constants";
 
 const GROQ_MODEL = 'llama-3.2-90b-vision-preview';
 
+// Helper for Title Case
+const toTitleCase = (str: string) => {
+  return str.toLowerCase().split(' ').map(word => {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 // Helper to convert File to Base64 Data URL
 const fileToDataURL = async (file: File): Promise<string> => {
   if (file.type.startsWith('image/')) {
@@ -44,7 +51,7 @@ const fileToDataURL = async (file: File): Promise<string> => {
     });
   }
 
-  // Fallback
+  // Fallback for non-image files
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
@@ -78,7 +85,6 @@ const callGroqApi = async (apiKey: string, payload: any, retries = 5) => {
                           error.message.includes('503');
       
       if (isRetryable && i < retries - 1) {
-        // Groq has tight rate limits, so we use slightly longer backoff
         const delay = 3000 * Math.pow(2, i) + (Math.random() * 1000);
         console.warn(`Groq API Error. Retrying in ${Math.round(delay)}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -160,8 +166,6 @@ export const generateMetadataForPlatformGroq = async (
           ]
         }
       ],
-      // Note: Groq Vision models do not currently support response_format: { type: "json_object" } consistently.
-      // We rely on the system prompt to enforce JSON structure.
       temperature: 0.5,
       max_tokens: 1024,
     });
@@ -176,6 +180,12 @@ export const generateMetadataForPlatformGroq = async (
 
     // --- Post-Processing ---
     let title = json.title || "";
+    
+    // Enforce Title Case if setting is enabled
+    if (settings.enforceTitleCase) {
+      title = toTitleCase(title);
+    }
+
     if (title.length < config.titleMin) title += " - High Quality Stock Photo";
     if (title.length > config.titleMax) {
       const cut = title.substring(0, config.titleMax);

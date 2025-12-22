@@ -3,6 +3,13 @@ import { PLATFORM_CONFIGS } from "../constants";
 
 const MISTRAL_MODEL = 'pixtral-12b-2409';
 
+// Helper for Title Case
+const toTitleCase = (str: string) => {
+  return str.toLowerCase().split(' ').map(word => {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 // Helper to convert File to Base64 (reused concept from geminiService but simplified for DataURL)
 const fileToDataURL = async (file: File): Promise<string> => {
   if (file.type.startsWith('image/')) {
@@ -100,48 +107,61 @@ export const generateMetadataForPlatformMistral = async (
   const imageDataUrl = await fileToDataURL(fileToProcess);
 
   // --- Construct System Prompt ---
-  let systemInstructions = `You are an Elite Stock Photography Metadata Expert for ${config.name}.
-  OBJECTIVE: Generate high-converting, strictly compliant, and SEO-optimized metadata.
+  let systemInstructions = `You are a World-Class Stock Photography Metadata & SEO Architect specializing in ${config.name}.
   
-  PLATFORM RULES:
-  - Title: ${config.titleMin}-${config.titleMax} chars. Title Case.
-  - Description: Max ${config.descMax} chars.
-  - Keywords: ${config.keywordsMin}-${config.keywordsMax} tags.
+  CORE MISSION:
+  Transform visual data into highly accurate, high-conversion metadata that maximizes search visibility and click-through rates.
   
-  CRITICAL:
-  - NO TRADEMARKS/BRANDS.
-  - NO REAL NAMES.
+  PLATFORM SPECS (${config.name}):
+  - Title: ${config.titleMin}-${config.titleMax} chars. Must be descriptive and front-loaded.
+  - Description: Max ${config.descMax} chars. Professional and engaging.
+  - Keywords: ${config.keywordsMin}-${config.keywordsMax} unique tags.
+  
+  SEO STRATEGY (FRONT-LOADING):
+  - Place the most critical subject or activity in the first 3-5 words of the title.
+  - Titles should act as an answer to a buyer's specific search query.
+  
+  KEYWORD HIERARCHY:
+  1. Primary: Literal objects and main subjects.
+  2. Secondary: Emotions, themes, and conceptual vibes (e.g., "collaboration", "tranquility").
+  3. Technical: Composition styles (e.g., "low angle", "bokeh", "minimalist").
+  
+  STRICT COMPLIANCE:
+  - NO BRAND NAMES or TRADEMARKS. Use generic terms.
+  - NO AI-generated jargon or generic filler words like "beautiful", "amazing", or "background" (unless technical).
   - Output strictly VALID JSON.
   `;
 
   const constraints = [];
-  if (settings.enableSilhouette) constraints.push("VISUAL: Subject is a silhouette/shadow.");
-  if (settings.enableWhiteBg) constraints.push("VISUAL: Isolated on white background.");
-  if (settings.enableTransparentBg) constraints.push("VISUAL: Transparent background.");
+  if (settings.enableSilhouette) constraints.push("VISUAL CONTEXT: The subject is strictly a silhouette.");
+  if (settings.enableWhiteBg) constraints.push("VISUAL CONTEXT: Subject is isolated on a pure white background.");
+  if (settings.enableTransparentBg) constraints.push("VISUAL CONTEXT: Subject has a transparent background (alpha channel).");
   
   if (settings.enableSingleWordKeywords) {
-    constraints.push("KEYWORDS: STRICTLY SINGLE WORDS ONLY. Split phrases.");
+    constraints.push("KEYWORD FORMAT: STRICTLY single words only. Deconstruct phrases into separate tags.");
   } else {
-    constraints.push("KEYWORDS: Allow 2-3 word phrases.");
+    constraints.push("KEYWORD FORMAT: Use a mix of single words and high-intent 2-3 word phrases.");
   }
 
   if (settings.enableProhibitedWords && settings.prohibitedWordsText) {
-    constraints.push(`NEGATIVE LIST: Exclude: ${settings.prohibitedWordsText}.`);
+    constraints.push(`NEGATIVE LIST: NEVER use these terms: ${settings.prohibitedWordsText}.`);
   }
 
   if (constraints.length > 0) {
-    systemInstructions += `\n\nCONSTRAINTS:\n${constraints.join("\n")}`;
+    systemInstructions += `\n\nADDITIONAL STIPULATIONS:\n${constraints.join("\n")}`;
   }
 
   if (settings.enableCustomPrompt && settings.customPromptText) {
-    systemInstructions += `\n\nUSER INSTRUCTION:\n${settings.customPromptText}`;
+    systemInstructions += `\n\nUSER-SPECIFIC DIRECTIVE:\n${settings.customPromptText}`;
   }
 
-  const userPrompt = `Analyze this image. Return JSON with 'title', 'description', and 'keywords' (array of strings).
+  const userPrompt = `Perform a deep analysis of this image and generate JSON metadata.
   
-  1. TITLE: ${settings.minTitleWords}-${settings.maxTitleWords} words. Most important subject first.
-  2. DESCRIPTION: ${settings.minDescWords}-${settings.maxDescWords} words. Full sentence.
-  3. KEYWORDS: ${settings.minKeywords}-${settings.maxKeywords} tags. Sort by importance.`;
+  1. TITLE: Target ${settings.minTitleWords}-${settings.maxTitleWords} words. Front-load the subject. Ensure it matches ${config.name} standards.
+  2. DESCRIPTION: Target ${settings.minDescWords}-${settings.maxDescWords} words. Provide context, use case, and atmospheric details.
+  3. KEYWORDS: Provide ${settings.minKeywords}-${settings.maxKeywords} tags. Sort by relevance. Include a mix of literal, conceptual, and technical tags.
+  
+  Format as: {"title": "...", "description": "...", "keywords": ["...", "..."]}`;
 
   try {
     const result = await callMistralApi(apiKey, {
@@ -160,8 +180,8 @@ export const generateMetadataForPlatformMistral = async (
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.5,
-      max_tokens: 1000,
+      temperature: 0.4, // Lower temperature for higher consistency and accuracy
+      max_tokens: 1200,
     });
 
     const content = result.choices[0]?.message?.content;
@@ -169,9 +189,15 @@ export const generateMetadataForPlatformMistral = async (
 
     const json = JSON.parse(content);
 
-    // --- Post-Processing (Same as Gemini) ---
+    // --- Post-Processing ---
     let title = json.title || "";
-    if (title.length < config.titleMin) title += " - High Quality Stock Photo";
+    
+    // Enforce Title Case if setting is enabled
+    if (settings.enforceTitleCase) {
+      title = toTitleCase(title);
+    }
+
+    // Hard limit truncation
     if (title.length > config.titleMax) {
       const cut = title.substring(0, config.titleMax);
       title = cut.substring(0, Math.min(cut.length, cut.lastIndexOf(" "))) || cut;

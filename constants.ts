@@ -40,4 +40,4 @@ export const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
 };
 
 export const MAX_FILES = 1000;
-export const GEMINI_MODEL = 'gemini-2.5-flash';
+export const GEMINI_MODEL = 'gemini-3-flash-preview';

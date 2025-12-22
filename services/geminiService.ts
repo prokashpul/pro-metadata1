@@ -2,6 +2,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Platform, Metadata, GenerationSettings } from "../types";
 import { PLATFORM_CONFIGS, GEMINI_MODEL } from "../constants";
 
+// Helper for Title Case
+const toTitleCase = (str: string) => {
+  return str.toLowerCase().split(' ').map(word => {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 // Helper to convert File to Base64 with resizing for optimization
 const fileToPart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
   // If image, resize to max 1536px to save bandwidth and memory
@@ -226,6 +233,12 @@ export const generateMetadataForPlatform = async (
     
     // Clean Title
     let title = json.title || "";
+    
+    // Enforce Title Case if setting is enabled
+    if (settings.enforceTitleCase) {
+      title = toTitleCase(title);
+    }
+
     // Ensure title meets min length logic (padding if needed for SEO)
     if (title.length < config.titleMin) {
        title += " - High Quality Stock Photo";
